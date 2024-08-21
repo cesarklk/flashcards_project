@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicación de Flashcards</title>
+    <style>
+        .flashcard {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        #loginForm, #flashcardContent {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Aplicación de Flashcards</h1>
+    
+    <div id="loginForm">
+        <input type="email" id="email" placeholder="Correo electrónico" required>
+        <input type="password" id="password" placeholder="Contraseña" required>
+        <button onclick="login()">Iniciar Sesión</button>
+    </div>
+
+    <div id="flashcardContent">
+        <form id="flashcardForm">
+            <input type="text" id="frontInput" placeholder="Pregunta" required>
+            <input type="text" id="backInput" placeholder="Respuesta" required>
+            <button type="submit">Agregar Flashcard</button>
+        </form>
+
+        <div id="flashcardContainer"></div>
+        
+        <button id="nextButton">Siguiente Flashcard</button>
+    </div>
+
+    <script>
+        let currentFlashcardIndex = 0;
+        let flashcards = [];
+
+        function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            fetch('/api/login/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.token) {
+                    localStorage.setItem('authToken', data.token);
+                    document.getElementById('loginForm').style.display = 'none';
+                    document.getElementById('flashcardContent').style.display = 'block';
+                    loadFlashcards();
+                } else {
+                    alert('Inicio de sesión fallido. Por favor, intenta de nuevo.');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function loadFlashcards() {
+            const token = localStorage.getItem('authToken');
+            fetch('/api/flashcards/', {
+                headers: {
+                    'Authorization': `Token ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                flashcards = data;
+                displayFlashcard();
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        document.getElementById('flashcardForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const question = document.getElementById('frontInput').value;
+            const answer = document.getElementById('backInput').value;
+            const token = localStorage.getItem('authToken');
+            
+            fetch('/api/flashcards/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Token ${token}`
+                },
+                body: JSON.stringify({ question, answer })
+            })
+            .then(response => response.json())
+            .then(data => {
+                flashcards.push(data);
+                displayFlashcard();
+                document.getElementById('flashcardForm').reset();
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        function displayFlashcard() {
+            if (flashcards.length === 0) return;
+            
+            const flashcard = flashcards[currentFlashcardIndex];
+            const container = document.getElementById('flashcardContainer');
+            container.innerHTML = `
+                <div class="flashcard" onclick="this.innerHTML=flashcards[${currentFlashcardIndex}].back">
+                    <h3>${flashcard.front}</h3>
+                </div>
+            `;
+        }
+
+        document.getElementById('nextButton').addEventListener('click', () => {
+            currentFlashcardIndex = (currentFlashcardIndex + 1) % flashcards.length;
+            displayFlashcard();
+        });
+
+        // Mostrar el formulario de inicio de sesión al cargar la página
+        document.getElementById('loginForm').style.display = 'block';
+    </script>
+</body>
+</html>
